@@ -1,0 +1,135 @@
+local Console = {}
+
+-- Variables
+local RepStorage = game:GetService("ReplicatedStorage")
+local OtherRepEvents = RepStorage:WaitForChild("Connectors"):WaitForChild("OtherReplicatedConnections")
+local CommandRemote = OtherRepEvents:WaitForChild("CommandReceiver")
+
+local Gui = script:FindFirstAncestorOfClass("ScreenGui")
+local Window = Gui:FindFirstChild("Window")
+local console = Window:FindFirstChild("Console", true)
+local MessageLog = console:FindFirstChild("OutputWindow"):FindFirstChild("OutputWindow")
+local CmdLine = console.Command.TextBox
+
+-- Track the number the current message output.
+local MSG_NUM = 1
+local DefaultCmdLineText = "Enter a command. Type /help or /cmds for a list of commands."
+
+----------------------------------------------------------------------------------------------------------------------
+--//                                              Private Functions                                               //--
+----------------------------------------------------------------------------------------------------------------------
+
+-- Post a message to the console. Supply the message and a format table.
+-- The format table can contain the following:
+--	["IsBold"] = <bool> - Sets if the text is bold
+--	["FontColor"] = <Color3> - Font color. If not supplied, the default is used.
+
+local function ClearMessages()
+	for _,v in ipairs(MessageLog:GetChildren()) do
+		v:Destroy()
+	end
+end
+
+local function CreateMessage(text, formatTable)
+	
+	formatTable = formatTable or {}	
+	
+	-- Shift all messages up.
+	for _,v in ipairs(MessageLog:GetChildren()) do
+		v.Position = v.Position + UDim2.new(0, 0, 0, -18)
+		if ((v.Position.Y.Offset * -1) > MessageLog.CanvasSize.Y.Offset) then
+			v:Destroy()
+		end
+	end
+
+	-- Create new message.
+	local Msg = Instance.new("TextLabel")
+	Msg.Name = "Msg_" .. tostring(MSG_NUM)
+	Msg.Text = text
+	Msg.Size = UDim2.new(1, -10, 0, 18)
+	Msg.TextSize = 16
+	Msg.Font = ( (formatTable["IsBold"] or false) and (Enum.Font.SourceSansBold) ) or Enum.Font.SourceSans
+	Msg.TextColor3 = formatTable["FontColor"] or Color3.fromRGB(255, 255, 255)
+	Msg.Position = UDim2.new(0, 5, 1, -18)
+	Msg.BackgroundTransparency = 1	
+	Msg.ZIndex = 2
+	Msg.TextXAlignment = Enum.TextXAlignment.Left	
+	Msg.Parent = MessageLog
+	
+	MessageLog.CanvasPosition = Vector2.new(0, MessageLog.CanvasSize.Y.Offset - MessageLog.Size.Y.Offset)
+	
+	-- Increment counter.
+	MSG_NUM = MSG_NUM + 1
+end
+
+local function CommandEntered(enterPressed, inputKey)
+	-- Check that the enter key was pressed.	
+	if not (enterPressed) then return end
+	
+	local message = CmdLine.Text
+	CmdLine.Text = DefaultCmdLineText
+	
+	CreateMessage(message, {["FontColor"] = Color3.fromRGB(255, 255, 255) , ["IsBold"] = true})	
+	
+	-- Clear screen command.
+	if (string.lower(message) == "/cls") then
+		ClearMessages()
+		return
+	end	
+	--Jail command
+	if (string.lower(message) == "/jail") then
+		game.Player.CFrame.New(0,0,0) -- Put in the pisition of the jail
+		game.Player.Backpack.tools:Destroy()
+	end
+	if (string.lower(message) == "/spawn") then
+	game.ReplicatedStorage.RemoteEvents.Respawn_Character:FireServer()
+	end
+	if (string.lower(message) == "/spawn") then
+	game.ReplicatedStorage.RemoteEvents.Respawn_Character:FireServer()
+	end
+	if string.lower(message) == "/loadmap dust" then
+	game.ReplicatedStorage.Dust:FireServer()
+	end
+	if string.lower(message) == "/loadmap harbor" then
+	game.ReplicatedStorage.Harbor:FireServer()
+	end
+	if string.lower(message) == "/loadmap bricktops" then
+	game.ReplicatedStorage.Bricktops:FireServer()
+	end
+	if string.lower(message) == "/end" then
+	game.ReplicatedStorage.Stop:FireServer()
+	end
+	if string.lower(message) == "/kill" then
+	game.Workspace.Player.Head:Destroy()
+	end
+	-- Send command to the server for processing.	
+	local Success, ReturnMsgs, StyleDictionary = CommandRemote:InvokeServer(message)
+
+	if type(ReturnMsgs) ~= "table" then ReturnMsgs = {ReturnMsgs} end
+		
+	-- Output all messages.
+	for _,v in ipairs(ReturnMsgs) do
+		CreateMessage(v, StyleDictionary)
+	end	
+end
+
+----------------------------------------------------------------------------------------------------------------------
+--//                                               Public Functions                                               //--
+----------------------------------------------------------------------------------------------------------------------
+
+function Console:WritePlain(text)
+	CreateMessage(text, {["IsBold"] = false})
+end
+
+----------------------------------------------------------------------------------------------------------------------
+--//                                               Event Connections                                              //--
+----------------------------------------------------------------------------------------------------------------------
+
+-- Connect textbox action to function.
+CmdLine.FocusLost:Connect(CommandEntered)
+
+----------------------------------------------------------------------------------------------------------------------
+--//                                                  End Module                                                  //--
+----------------------------------------------------------------------------------------------------------------------
+
+return Console
